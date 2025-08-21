@@ -30,12 +30,18 @@ dequote() {
   printf '%s' "$v"
 }
 
+# ---- Normalize DB envs (works with MYSQL_B3_* or B3_DB_*) --------------------
+MYSQL_B3_HOST="${MYSQL_B3_HOST:-${B3_DB_HOST:-db}}"
+MYSQL_B3_DB="${MYSQL_B3_DB:-${B3_DB_NAME:-b3}}"
+MYSQL_B3_USER="${MYSQL_B3_USER:-${B3_DB_USER:-b3user}}"
+MYSQL_B3_PASSWORD="${MYSQL_B3_PASSWORD:-${B3_DB_PASS:-b3pass}}"
 # --- gather env (falling back to sane defaults) ---
-DB_HOST="$(dequote "${B3_DB_HOST:-db}")"
+DB_HOST="db"
 DB_NAME="$(dequote "${MYSQL_B3_DB:-b3}")"
-DB_USER="$(dequote "${MYSQL_B3_USER:-user}")"
-DB_PASS="$(dequote "${MYSQL_B3_PASSWORD:-pass}")"
+DB_USER="$(dequote "${MYSQL_B3_USER:-b3user}")"
+DB_PASS="$(dequote "${MYSQL_B3_PASSWORD:-b3pass}")"
 DB_DSN="mysql://${DB_USER}:${DB_PASS}@${DB_HOST}/${DB_NAME}"
+
 
 PARSER="$(dequote "${B3_PARSER:-cod}")"
 BOT_NAME="$(dequote "${B3_BOT_NAME:-b3}")"
@@ -87,16 +93,32 @@ awk -v parser="$PARSER" \
     } else if (sec ~ /^\[server\]/) {
       if ($0 ~ /^[ \t]*game_log[ \t]*:/)       {$0="game_log: " game_log}
       else if ($0 ~ /^[ \t]*rcon_ip[ \t]*:/)   {$0="rcon_ip: " rip}
-      else if ($0 ~ /^[ \t]*rcon_port[ \t]*:/) {$0="rcon_port: " rport}
+      else if ($0 ~ /^[ \t]*port[ \t]*:/) {$0="port: " rport}
       else if ($0 ~ /^[ \t]*rcon_password[ \t]*:/){$0="rcon_password: " rpass}
-    }
+	  else if ($0 ~ /^[ \t]*punkbuster[ \t]*:/){$0="punkbuster: " "off"}
+    } else if (sec ~ /^\[plugins\]/) {
+	  if ($0 ~ /^[ \t]*# xlrstats[ \t]*:/)       {$0="xlrstats: " "@b3/conf/plugin_xlrstats.ini"}
+	}
     print
   }
 ' "$OUT_INI" > "${OUT_INI}.tmp" && mv "${OUT_INI}.tmp" "$OUT_INI"
 
 echo "==== Using b3.ini (key lines) ===="
-egrep -n '^\[b3\]$|^\[server\]$|^(parser|database|bot_name|bot_prefix|game_log|rcon_ip|rcon_port|rcon_password)\s*:' "$OUT_INI" || true
+egrep -n '^\[b3\]$|^\[server\]$|^(parser|database|bot_name|bot_prefix|game_log|rcon_ip|port|rcon_password|punkbuster|xlrstats)\s*:' "$OUT_INI" || true
 echo "=================================="
+
+# --- B3: ensure schema is present ------------------------------------------------
+echo "[b3-init] Ensuring B3 schema exists in ${MYSQL_B3_DB} …"
+
+# Check a canonical table (e.g., "clients"). Adjust if your schema differs.
+if ! mysql -h db -u"${MYSQL_B3_USER}" -p"${MYSQL_B3_PASSWORD}" "${MYSQL_B3_DB}" \
+     -N -e "SHOW TABLES LIKE 'clients';" | grep -q clients; then
+  echo "[b3-init] Importing /opt/b3/b3/sql/mysql/b3.sql into ${MYSQL_B3_DB} …"
+  mysql -h db -u"${MYSQL_B3_USER}" -p"${MYSQL_B3_PASSWORD}" "${MYSQL_B3_DB}" < /opt/b3/b3/sql/mysql/b3.sql
+  echo "[b3-init] B3 schema imported."
+else
+  echo "[b3-init] B3 schema already present; skipping import."
+fi
 
 # run b3
 exec python /opt/b3/b3_run.py -c "$OUT_INI"

@@ -4,6 +4,13 @@
     restart: unless-stopped
     environment:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_B3_DB:       ${MYSQL_B3_DB}
+      MYSQL_B3_USER:     ${MYSQL_B3_USER}
+      MYSQL_B3_PASSWORD: ${MYSQL_B3_PASSWORD}
+
+      MYSQL_XLR_DB:       ${MYSQL_XLR_DB}
+      MYSQL_XLR_USER:     ${MYSQL_XLR_USER}
+      MYSQL_XLR_PASSWORD: ${MYSQL_XLR_PASSWORD}
     command: ["--character-set-server=utf8mb4","--collation-server=utf8mb4_unicode_ci","--max_connections=200","--sql-mode="]
     volumes:
       - db_data:/var/lib/mysql

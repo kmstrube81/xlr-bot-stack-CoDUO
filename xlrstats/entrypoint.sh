@@ -140,17 +140,19 @@ if have_table "servers"; then
   SNAME="${XLR_SERVER_NAME:-server}"
   GAME="${XLR_GAME:-coduo}"
   B3H="db"
-  B3U="${B3_DB_USER:-b3user}"
-  B3P="${B3_DB_PASS:-b3pass}"
+  B3D="${MYSQL_B3_DB:-b3}"
+  B3U="${MYSQL_B3_USER:-b3user}"
+  B3P="${MYSQL_B3_PASSWORD:-b3pass}"
 
   if ! _mysql "SELECT id FROM servers WHERE servername='$(sql_esc "$SNAME")' LIMIT 1" | grep -q .; then
-    F=(servername gamename dbhost dbuser dbpass)
+    F=(servername gamename dbhost dbuser dbpass dbname)
     V=(
       "'$(sql_esc "$SNAME")'"
       "'$(sql_esc "$GAME")'"
       "'$(sql_esc "$B3H")'"
       "'$(sql_esc "$B3U")'"
       "'$(sql_esc "$B3P")'"
+	  "'$(sql_esc "$B3D")'"
     )
     if have_col servers created; then F+=(created); V+=("'$(date +"%F %T")'"); fi
     if have_col servers updated; then F+=(updated); V+=("'$(date +"%F %T")'"); fi
