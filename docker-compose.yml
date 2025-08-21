@@ -1,0 +1,78 @@
+﻿services:
+  db:
+    image: mariadb:10.6
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+    command: ["--character-set-server=utf8mb4","--collation-server=utf8mb4_unicode_ci","--max_connections=200","--sql-mode="]
+    volumes:
+      - db_data:/var/lib/mysql
+      - ./_mysql-init:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  phpmyadmin:
+    image: phpmyadmin/phpmyadmin:latest
+    restart: unless-stopped
+    environment:
+      PMA_HOST: db
+      PMA_USER: root
+      PMA_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+    ports:
+      - "8089:80"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  b3:
+    build: ./b3
+    restart: unless-stopped
+    environment:
+      TZ: ${TZ}
+      B3_DB_HOST: db
+      B3_DB_NAME: ${MYSQL_B3_DB}
+      B3_DB_USER: ${MYSQL_B3_USER}
+      B3_DB_PASS: ${MYSQL_B3_PASSWORD}
+    depends_on:
+      db:
+        condition: service_healthy
+    
+    volumes:
+      - type: bind
+        source: ${B3_GAME_LOG_PATH}
+        target: /game-logs/games_mp.log
+        read_only: true
+      - ./b3/conf:/app/conf
+      - b3_log:/app/logs
+      
+  xlrstats:
+    build: ./xlrstats
+    restart: unless-stopped
+    environment:
+      TZ: ${TZ}
+      XLR_DB_HOST: db
+      XLR_DB_NAME: ${MYSQL_XLR_DB}
+      XLR_DB_USER: ${MYSQL_XLR_USER}
+      XLR_DB_PASS: ${MYSQL_XLR_PASSWORD}
+      XLR_BASE_URL: ${XLR_BASE_URL}
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "8088:80"
+
+volumes:
+  db_data:
+  b3_log:
+
+
+
+
+
+
+
+
+
