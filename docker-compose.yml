@@ -16,7 +16,7 @@
       - db_data:/var/lib/mysql
       - ./_mysql-init:/docker-entrypoint-initdb.d
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD}"]
       interval: 5s
       timeout: 5s
       retries: 20
@@ -53,7 +53,8 @@
         target: /game-logs/games_mp.log
         read_only: true
       - ./b3/conf:/app/conf
-      - b3_log:/app/logs
+      - ./b3/log:/app/logs
+      - ./b3/extplugins:/app/extplugins
       
   xlrstats:
     build: ./xlrstats

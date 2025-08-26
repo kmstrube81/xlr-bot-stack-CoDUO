@@ -78,15 +78,15 @@ sed -i "s/^ServerName .*/ServerName ${XLR_VHOST}/" /etc/apache2/conf-available/s
 apachectl -t >/dev/null 2>&1 || true
 
 # --- Patch XlrFunctionsComponent to disable license calls ---
-XLR_FILE="/var/www/html/app/Controller/Component/XlrFunctionsComponent.php"
-if [ -f "$XLR_FILE" ]; then
-  echo "Patching getLicenseDetails() in $XLR_FILE ..."
+#XLR_FILE="/var/www/html/app/Controller/Component/XlrFunctionsComponent.php"
+#if [ -f "$XLR_FILE" ]; then
+#  echo "Patching getLicenseDetails() in $XLR_FILE ..."
   # Replace the entire function block (201–249) with a stub
-  sed -i '201,249c\
-    public function getLicenseDetails($key) {\n\
-        return false;\n\
-    }' "$XLR_FILE"
-fi
+#  sed -i '201,249c\
+#    public function getLicenseDetails($key) {\n\
+#        return false;\n\
+#    }' "$XLR_FILE"
+#fi
 
 # --- Disable installer wizard ---
 CORE_FILE="$APP_ROOT/app/Config/core.php"

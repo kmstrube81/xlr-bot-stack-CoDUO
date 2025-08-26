@@ -28,7 +28,7 @@ RUN echo "date.timezone=${TZ}" > /usr/local/etc/php/conf.d/timezone.ini
 
 # Fetch app without apt (Debian Stretch is EOL)
 WORKDIR /var/www
-ADD https://github.com/XLRstats/xlrstats-web-v3/archive/refs/heads/master.tar.gz /tmp/xlrstats.tar.gz
+ADD https://github.com/XLRstats/xlrstats-web-v3/archive/refs/heads/latest_merge_no_licence_check.tar.gz /tmp/xlrstats.tar.gz
 RUN set -eux; \
     rm -rf /var/www/html/*; \
     SRC="$(tar -tzf /tmp/xlrstats.tar.gz | head -1 | cut -d/ -f1)"; \
