@@ -43,6 +43,12 @@
       B3_DB_NAME: ${MYSQL_B3_DB}
       B3_DB_USER: ${MYSQL_B3_USER}
       B3_DB_PASS: ${MYSQL_B3_PASSWORD}
+      B3_RCON_IP: ${B3_RCON_IP}
+      B3_RCON_PORT: ${B3_RCON_PORT}
+      B3_RCON_PASSWORD: ${B3_RCON_PASSWORD}
+      B3_PARSER: ${B3_PARSER}
+      B3_BOT_NAME: ${B3_BOT_NAME}
+      B3_BOT_PREFIX: ${B3_BOT_PREFIX}
     depends_on:
       db:
         condition: service_healthy

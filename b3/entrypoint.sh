@@ -29,10 +29,10 @@ dequote() {
 }
 
 # ---- Normalize DB/envs -------------------------------------------------------
-MYSQL_B3_HOST="${MYSQL_B3_HOST:-${B3_DB_HOST:-db}}"
-MYSQL_B3_DB="${MYSQL_B3_DB:-${B3_DB_NAME:-b3}}"
-MYSQL_B3_USER="${MYSQL_B3_USER:-${B3_DB_USER:-b3user}}"
-MYSQL_B3_PASSWORD="${MYSQL_B3_PASSWORD:-${B3_DB_PASS:-b3pass}}"
+#MYSQL_B3_HOST="${MYSQL_B3_HOST:-${B3_DB_HOST:-db}}"
+#MYSQL_B3_DB="${MYSQL_B3_DB:-${B3_DB_NAME:-b3}}"
+#MYSQL_B3_USER="${MYSQL_B3_USER:-${B3_DB_USER:-b3user}}"
+#MYSQL_B3_PASSWORD="${MYSQL_B3_PASSWORD:-${B3_DB_PASS:-b3pass}}"
 
 DB_HOST="${MYSQL_B3_HOST:-db}"
 DB_NAME="$(dequote "${MYSQL_B3_DB:-b3}")"
@@ -42,8 +42,8 @@ DB_DSN="mysql://${DB_USER}:${DB_PASS}@${DB_HOST}/${DB_NAME}"
 
 PARSER="$(dequote "${B3_PARSER:-cod}")"
 BOT_NAME="$(dequote "${B3_BOT_NAME:-b3}")"
-BOT_PREFIX="$(dequote "${B3_BOT_PREFIX:-!}")"
-GAME_LOG="$(dequote "${B3_GAME_LOG:-/game-logs/games_mp.log}")"
+BOT_PREFIX="$(dequote "${B3_BOT_PREFIX:-^0(^2b3^0)^7:}")"
+GAME_LOG="/game-logs/games_mp.log"
 RCON_IP="$(dequote "${B3_RCON_IP:-host.docker.internal}")"
 RCON_PORT="$(dequote "${B3_RCON_PORT:-28960}")"
 RCON_PASSWORD="$(dequote "${B3_RCON_PASSWORD:-rconpass}")"
@@ -65,13 +65,15 @@ echo "Using template: ${TEMPLATE}"
 echo "Target ini: ${OUT_INI}"
 echo "================================="
 
-# --- Create/modify b3.ini ONLY if it does not exist --------------------------
-if [ ! -f "$OUT_INI" ]; then
-  echo "[b3-init] No b3.ini detected; creating from template and applying rewrites…"
-  cp "$TEMPLATE" "$OUT_INI"
-  sed -i 's/\r$//' "$OUT_INI"
+# --- function: sync INI keys to env ------------------------------------------
+sync_b3_ini() {
+  local ini="$1"
+  local tmp="${ini}.tmp"
 
-  # Update only the keys we care about (in their sections)
+  # Normalize line endings once
+  sed -i 's/\r$//' "$ini" || true
+
+  # Update only the keys we care about, in the right sections.
   awk -v parser="$PARSER" \
       -v dsn="$DB_DSN" \
       -v bot="$BOT_NAME" \
@@ -80,61 +82,96 @@ if [ ! -f "$OUT_INI" ]; then
       -v rip="$RCON_IP" \
       -v rport="$RCON_PORT" \
       -v rpass="$RCON_PASSWORD" '
-    BEGIN { sec = "" }
+    BEGIN { sec = ""; seen_b3_log=0 }
     /^\[/ { sec = $0 }
+
     {
       if (sec ~ /^\[b3\]/) {
-        if ($0 ~ /^[ \t]*parser[ \t]*:/)        {$0="parser: " parser}
-        else if ($0 ~ /^[ \t]*database[ \t]*:/)  {$0="database: " dsn}
-        else if ($0 ~ /^[ \t]*bot_name[ \t]*:/)  {$0="bot_name: " bot}
-        else if ($0 ~ /^[ \t]*bot_prefix[ \t]*:/){$0="bot_prefix: " prefix}
+        if ($0 ~ /^[ \t]*parser[ \t]*[:=]/)        {$0="parser: " parser}
+        else if ($0 ~ /^[ \t]*database[ \t]*[:=]/) {$0="database: " dsn}
+        else if ($0 ~ /^[ \t]*bot_name[ \t]*[:=]/) {$0="bot_name: " bot}
+        else if ($0 ~ /^[ \t]*bot_prefix[ \t]*[:=]/){$0="bot_prefix: " prefix}
       } else if (sec ~ /^\[server\]/) {
-        if ($0 ~ /^[ \t]*game_log[ \t]*:/)       {$0="game_log: " game_log}
-        else if ($0 ~ /^[ \t]*rcon_ip[ \t]*:/)   {$0="rcon_ip: " rip}
-        else if ($0 ~ /^[ \t]*port[ \t]*:/)      {$0="port: " rport}
-        else if ($0 ~ /^[ \t]*rcon_password[ \t]*:/){$0="rcon_password: " rpass}
-        else if ($0 ~ /^[ \t]*punkbuster[ \t]*:/){$0="punkbuster: off"}
+        if ($0 ~ /^[ \t]*game_log[ \t]*[:=]/)       {$0="game_log: " game_log}
+        else if ($0 ~ /^[ \t]*rcon_ip[ \t]*[:=]/)   {$0="rcon_ip: " rip}
+        else if ($0 ~ /^[ \t]*port[ \t]*[:=]/)      {$0="port: " rport}
+        else if ($0 ~ /^[ \t]*rcon_password[ \t]*[:=]/){$0="rcon_password: " rpass}
+        else if ($0 ~ /^[ \t]*punkbuster[ \t]*[:=]/){$0="punkbuster: off"}
       } else if (sec ~ /^\[plugins\]/) {
-        if ($0 ~ /^[ \t]*# xlrstats[ \t]*:/)     {$0="xlrstats: /app/conf/plugin_xlrstats.ini"}
+        # Make sure xlrstats points to our conf dir if present in template
+        if ($0 ~ /^[ \t]*#?[ \t]*xlrstats[ \t]*[:=]/) { $0 = "xlrstats: /app/conf/plugin_xlrstats.ini" }
       }
       print
     }
-  ' "$OUT_INI" > "${OUT_INI}.tmp" && mv "${OUT_INI}.tmp" "$OUT_INI"
+  ' "$ini" > "$tmp" && mv "$tmp" "$ini"
 
-  # Normalize plugin config paths to our volumes
+  # Normalize plugin config paths & extplugins dir
   sed -i -E \
     -e 's#@?b3/conf/#/app/conf/#g' \
     -e 's#(^[[:space:]]*[A-Za-z0-9_]+:[[:space:]]*)conf/#\1/app/conf/#' \
     -e 's#@?b3/extplugins/#/app/extplugins/#g' \
     -e 's#(^[[:space:]]*external_plugins_dir[[:space:]]*:[[:space:]]*).*$#\1/app/extplugins#' \
     -e 's#(^[[:space:]]*[A-Za-z0-9_]+:[[:space:]]*)extplugins/#\1/app/extplugins/#' \
-    "$OUT_INI"
+    "$ini"
+}
 
+# --- Create b3.ini if missing; otherwise keep but re-sync to env -------------
+if [ ! -f "$OUT_INI" ]; then
+  echo "[b3-init] No b3.ini detected; creating from template…"
+  cp "$TEMPLATE" "$OUT_INI"
+  sync_b3_ini "$OUT_INI"
   echo "==== Using b3.ini (key lines) ===="
   egrep -n '^\[b3\]$|^\[server\]$|^(parser|database|bot_name|bot_prefix|game_log|rcon_ip|port|rcon_password|punkbuster)\s*:' "$OUT_INI" || true
   echo "==== Plugin path samples =========="
   egrep -n '^\[plugins\]$|^[[:space:]]*[A-Za-z0-9_]+:[[:space:]]*/app/(conf|extplugins)/|^[[:space:]]*external_plugins_dir[[:space:]]*:' "$OUT_INI" || true
   echo "=================================="
 else
-  echo "[b3-init] Found existing /app/conf/b3.ini; leaving unchanged."
+  echo "[b3-init] Found existing /app/conf/b3.ini; syncing keys to current env…"
+  # Make a one-time backup of the user’s original file
+  if [ ! -f "${OUT_INI}.orig" ]; then
+    cp "$OUT_INI" "${OUT_INI}.orig"
+  fi
+  sync_b3_ini "$OUT_INI"
 fi
 
+### --- force B3 log to /app/logs/b3.log (idempotent) ---
+LOG_TARGET="/app/logs/b3.log"
+B3_INI="/app/conf/b3.ini"
+
+mkdir -p "$(dirname "$LOG_TARGET")"
+touch "$LOG_TARGET"
+
+if [ -f "$B3_INI" ]; then
+  awk -v target="$LOG_TARGET" '
+    BEGIN { in_b3=0; found=0 }
+    /^\s*\[/ {
+      if (in_b3 && !found) print "logfile: " target
+      in_b3 = ($0 ~ /^\s*\[b3\]\s*$/)
+      found = 0
+      print; next
+    }
+    {
+      if (in_b3) {
+        if ($0 ~ /^\s*#?\s*logfile\s*[:=]/) { print "logfile: " target; found=1 }
+        else { print }
+      } else { print }
+    }
+    END {
+      if (in_b3 && !found) print "logfile: " target
+    }
+  ' "$B3_INI" > "${B3_INI}.tmp" && mv "${B3_INI}.tmp" "$B3_INI"
+  echo "[b3-init] Patched b3.ini to use logfile = $LOG_TARGET"
+else
+  echo "[b3-init] WARNING: $B3_INI not found; cannot patch logfile path" >&2
+fi
+### --- END: force B3 log to /app/logs/b3.log ---
+
 # --- Copy *.ini and *.xml into /app/conf if missing --------------------------
-# Sources:
-#   1) the image defaults (/opt/b3/b3/conf)
-#   2) any loose files you might drop into /app (bind-mounted project root)
-for SRC in /opt/b3/b3/conf /app; do
+for SRC in /opt/b3/b3/conf; do
   if [ -d "$SRC" ]; then
-    # skip the conf dir itself to avoid self-copy loops
-    if [ "$SRC" = "/app/conf" ]; then continue; fi
     while IFS= read -r -d '' f; do
       base="$(basename "$f")"
-
-      # Never copy a source b3.ini; we either already created ours or we keep the user’s.
-      if [ "$base" = "b3.ini" ]; then
-        continue
-      fi
-
+      if [ "$base" = "b3.ini" ]; then continue; fi
       dst="/app/conf/$base"
       if [ ! -e "$dst" ]; then
         echo "[b3-init] Adding $(printf '%q' "$base") to /app/conf"
@@ -147,11 +184,11 @@ for SRC in /opt/b3/b3/conf /app; do
   fi
 done
 
-# --- B3: ensure schema is present ---------------------------------------------
-echo "[b3-init] Ensuring B3 schema exists in ${MYSQL_B3_DB} …"
+# --- B3: ensure schema is present --------------------------------------------
+echo "[b3-init] Ensuring B3 schema exists in ${DB_NAME} …"
 if ! mysql -h "$DB_HOST" -u"${DB_USER}" -p"${DB_PASS}" "${DB_NAME}" \
      -N -e "SHOW TABLES LIKE 'clients';" | grep -q clients; then
-  echo "[b3-init] Importing /opt/b3/b3/sql/mysql/b3.sql into ${MYSQL_B3_DB} …"
+  echo "[b3-init] Importing /opt/b3/b3/sql/mysql/b3.sql into ${DB_NAME} …"
   mysql -h "$DB_HOST" -u"${DB_USER}" -p"${DB_PASS}" "${DB_NAME}" < /opt/b3/b3/sql/mysql/b3.sql
   echo "[b3-init] B3 schema imported."
 else
