@@ -43,10 +43,22 @@ DB_DSN="mysql://${DB_USER}:${DB_PASS}@${DB_HOST}/${DB_NAME}"
 PARSER="$(dequote "${B3_PARSER:-cod}")"
 BOT_NAME="$(dequote "${B3_BOT_NAME:-b3}")"
 BOT_PREFIX="$(dequote "${B3_BOT_PREFIX:-^0(^2b3^0)^7:}")"
-GAME_LOG="/game-logs/games_mp.log"
 RCON_IP="$(dequote "${B3_RCON_IP:-host.docker.internal}")"
 RCON_PORT="$(dequote "${B3_RCON_PORT:-28960}")"
 RCON_PASSWORD="$(dequote "${B3_RCON_PASSWORD:-rconpass}")"
+GL_FILE_RAW="$(dequote "${B3_GAME_LOG_FILE:-}")"   # either filename OR full URL
+# Decide if the FILE is a remote URL
+if [[ "$GL_FILE_RAW" =~ ^https?:// || "$GL_FILE_RAW" =~ ^ftp:// ]]; then
+  # Remote: use URL directly (no reliance on /game-logs mount)
+  GAME_LOG="$GL_FILE_RAW"
+else
+  # Local file name: always point B3 at /game-logs/<file> inside the container
+  # (Your compose should mount $B3_GAME_LOG_DIR on the host to /game-logs in the container)
+  if [ -z "$GL_FILE_RAW" ]; then
+    GL_FILE_RAW="games_mp.log"
+  fi
+  GAME_LOG="/game-logs/${GL_FILE_RAW}"
+fi
 
 echo "=== ENV seen by b3 entrypoint ==="
 echo "MYSQL_B3_DB=${DB_NAME}"

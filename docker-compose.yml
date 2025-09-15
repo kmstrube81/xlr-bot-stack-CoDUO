@@ -49,14 +49,15 @@
       B3_PARSER: ${B3_PARSER}
       B3_BOT_NAME: ${B3_BOT_NAME}
       B3_BOT_PREFIX: ${B3_BOT_PREFIX}
+      B3_GAME_LOG_FILE: ${B3_GAME_LOG_FILE}
     depends_on:
       db:
         condition: service_healthy
     
     volumes:
       - type: bind
-        source: ${B3_GAME_LOG_PATH}
-        target: /game-logs/games_mp.log
+        source: ${B3_GAME_LOG_DIR}
+        target: /game-logs/
         read_only: true
       - ./b3/conf:/app/conf
       - ./b3/log:/app/logs
@@ -77,6 +78,18 @@
         condition: service_healthy
     ports:
       - "8088:80"
+  xlr-bot:
+    build: ./xlr-discord-bot
+    restart: unless-stopped
+    env_file: ./.env
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - type: bind
+        source: ./.env
+        target: /opt/xlrbot/cfg/.env
+        read_only: false
 
 volumes:
   db_data:
