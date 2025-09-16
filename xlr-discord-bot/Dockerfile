@@ -11,7 +11,15 @@ RUN mkdir -p $APP_DIR && chown -R node:node $APP_DIR
 
 # Copy entrypoint
 COPY entrypoint.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh
+
+# Copy in the script
+COPY entrypoint.sh /entrypoint.sh
+
+# Strip CRLF and any UTF-8 BOM, then make it executable
+RUN sed -i 's/\r$//' /entrypoint.sh \
+ && (head -c 3 /entrypoint.sh | od -An -t x1 | grep -qi "ef bb bf" \
+     && tail -c +4 /entrypoint.sh > /entrypoint.tmp && mv /entrypoint.tmp /entrypoint.sh || true) \
+ && chmod +x /entrypoint.sh
 
 USER node
 ENV NODE_ENV=production
