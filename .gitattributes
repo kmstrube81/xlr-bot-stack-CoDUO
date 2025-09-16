@@ -1,0 +1,8 @@
+# default to LF in this repo
+* text=auto eol=lf
+
+# force LF for scripts and YAML
+*.sh text eol=lf
+*.sql text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
